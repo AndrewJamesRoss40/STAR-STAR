@@ -1,0 +1,88 @@
+// 🏋️ Pull-Up Tracker App (Starter Code for Replit)
+// Frontend + Replit DB logging + Export to ChatGPT-style summary
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const { Database } = require("@replit/database");
+const db = new Database();
+const app = express();
+
+app.use(bodyParser.json());
+app.use(express.static('public'));
+
+// Log pull-up with timestamp
+app.post('/log', async (req, res) => {
+  const { reps } = req.body;
+  const timestamp = new Date().toISOString();
+  await db.set(timestamp, reps);
+  res.json({ status: 'logged', timestamp });
+});
+
+// Get all logs
+app.get('/logs', async (req, res) => {
+  const data = await db.list();
+  const entries = await Promise.all(
+    data.map(async key => ({ time: key, reps: await db.get(key) }))
+  );
+  res.json(entries);
+});
+
+// Export formatted data to clipboard-friendly string
+app.get('/export', async (req, res) => {
+  const keys = await db.list();
+  let total = 0;
+  const logs = [];
+
+  for (const key of keys) {
+    const reps = await db.get(key);
+    total += reps;
+    const t = new Date(key);
+    logs.push(`- ${t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → ${reps} reps`);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const exportText = `Project: Personal Fitness\nDate: ${today}\nPull-up Log:\n${logs.join("\n")}\nTotal: ${total} reps`;
+
+  res.json({ export: exportText });
+});
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
+});
+
+/*
+--- public/index.html (simple HTML interface) ---
+
+<html>
+  <body>
+    <h1>Pull-Up Tracker</h1>
+    <button onclick="logReps(1)">+1 Rep</button>
+    <input type="number" id="repsInput" value="5">
+    <button onclick="logManual()">Log Reps</button>
+    <button onclick="exportLog()">Export to ChatGPT</button>
+    <pre id="output"></pre>
+
+    <script>
+      async function logReps(n) {
+        await fetch('/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reps: n })
+        });
+      }
+
+      async function logManual() {
+        const val = parseInt(document.getElementById('repsInput').value);
+        if (!isNaN(val)) logReps(val);
+      }
+
+      async function exportLog() {
+        const res = await fetch('/export');
+        const data = await res.json();
+        document.getElementById('output').innerText = data.export;
+        navigator.clipboard.writeText(data.export);
+      }
+    </script>
+  </body>
+</html>
+*/

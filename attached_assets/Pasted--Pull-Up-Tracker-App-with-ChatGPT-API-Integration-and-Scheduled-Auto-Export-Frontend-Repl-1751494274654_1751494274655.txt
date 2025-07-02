@@ -1,0 +1,104 @@
+// 🏋️ Pull-Up Tracker App with ChatGPT API Integration and Scheduled Auto Export
+// Frontend + Replit DB logging + GPT-4 summary via API + Daily Cron Job
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const axios = require('axios');
+const { Database } = require("@replit/database");
+const db = new Database();
+const app = express();
+
+app.use(bodyParser.json());
+app.use(express.static('public'));
+
+// Log pull-up with timestamp
+app.post('/log', async (req, res) => {
+  const { reps } = req.body;
+  const timestamp = new Date().toISOString();
+  await db.set(timestamp, reps);
+  res.json({ status: 'logged', timestamp });
+});
+
+// Get all logs
+app.get('/logs', async (req, res) => {
+  const data = await db.list();
+  const entries = await Promise.all(
+    data.map(async key => ({ time: key, reps: await db.get(key) }))
+  );
+  res.json(entries);
+});
+
+// Export formatted data for ChatGPT
+app.get('/export', async (req, res) => {
+  const exportText = await buildExportText();
+  res.json({ export: exportText });
+});
+
+// Send summary to OpenAI GPT-4
+app.post('/send-to-gpt', async (req, res) => {
+  try {
+    const gptReply = await sendToChatGPT();
+    res.json({ reply: gptReply });
+  } catch (error) {
+    console.error('Error sending to GPT:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to send to GPT' });
+  }
+});
+
+// Helper: build export text
+async function buildExportText() {
+  const keys = await db.list();
+  let total = 0;
+  const logs = [];
+
+  for (const key of keys) {
+    const reps = await db.get(key);
+    total += reps;
+    const t = new Date(key);
+    logs.push(`- ${t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → ${reps} reps`);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  return `Project: Personal Fitness\nDate: ${today}\nPull-up Log:\n${logs.join("\n")}\nTotal: ${total} reps`;
+}
+
+// Helper: send to GPT
+async function sendToChatGPT() {
+  const exportText = await buildExportText();
+
+  const response = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: 'Track fitness logs under the project "Personal Fitness".' },
+        { role: 'user', content: exportText }
+      ]
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  return response.data.choices[0].message.content;
+}
+
+// Scheduled job for daily auto-export to GPT
+// To use this: Add a scheduled job in .replit or Replit's Scheduled Tasks UI
+app.get('/cron-send-daily', async (req, res) => {
+  try {
+    const gptReply = await sendToChatGPT();
+    console.log('✅ Daily export sent to ChatGPT.');
+    res.send('Daily export sent to ChatGPT.');
+  } catch (error) {
+    console.error('❌ Daily GPT export failed:', error.response?.data || error.message);
+    res.status(500).send('Daily GPT export failed.');
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
+});

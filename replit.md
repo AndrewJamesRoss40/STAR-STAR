@@ -96,6 +96,11 @@ The application uses two main tables:
 ```
 Changelog:
 - July 02, 2025. Initial setup
+- July 03, 2025. Added OpenAI Assistants API integration with specialized fitness coaching
+  - Created Python-based fitness coach with detailed prompt for 62-year-old male client
+  - Added specialized fitness analysis and nutrition advice endpoints
+  - Integrated with frontend UI with new buttons for Fitness Coach and Nutrition advice
+  - Updated mobile clipboard handling for better iPhone compatibility
 ```
 
 ## User Preferences

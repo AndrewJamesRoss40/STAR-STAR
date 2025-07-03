@@ -95,6 +95,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fitness Assistant API endpoints
+  app.post('/api/fitness-assistant/analyze', async (req, res) => {
+    try {
+      const { spawn } = require('child_process');
+      
+      // Get current workout data
+      const logs = await storage.getPullupLogs();
+      const todayStats = await storage.getTotalRepsToday();
+      const weekStats = await storage.getTotalRepsThisWeek();
+      const personalRecord = await storage.getPersonalRecord();
+      
+      const workoutData = {
+        date: new Date().toISOString().split('T')[0],
+        total_reps_today: todayStats,
+        total_reps_week: weekStats,
+        personal_record: personalRecord,
+        recent_logs: logs.slice(-10).map(log => ({
+          time: new Date(log.timestamp).toLocaleTimeString(),
+          reps: log.reps
+        }))
+      };
+      
+      // Call Python fitness coach
+      const python = spawn('python3', [
+        'fitness_coach.py',
+        'analyze',
+        JSON.stringify(workoutData)
+      ]);
+      
+      let output = '';
+      let error = '';
+      
+      python.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+      
+      python.stderr.on('data', (data) => {
+        error += data.toString();
+      });
+      
+      python.on('close', (code) => {
+        if (code === 0) {
+          res.json({ 
+            analysis: output.trim(),
+            workout_data: workoutData
+          });
+        } else {
+          console.error('Python error:', error);
+          res.status(500).json({ error: 'Failed to get fitness analysis' });
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error calling fitness assistant:', error);
+      res.status(500).json({ error: 'Failed to analyze workout data' });
+    }
+  });
+
+  app.post('/api/fitness-assistant/nutrition', async (req, res) => {
+    try {
+      const { spawn } = require('child_process');
+      
+      const clientStats = {
+        age: 62,
+        height: "5'10\"",
+        current_weight: 172,
+        goal_weight: 152,
+        activity_level: "active",
+        goal: "lose 20 lbs while maximizing lean muscle mass"
+      };
+      
+      // Call Python fitness coach for nutrition advice
+      const python = spawn('python3', [
+        'fitness_coach.py',
+        'nutrition',
+        JSON.stringify(clientStats)
+      ]);
+      
+      let output = '';
+      let error = '';
+      
+      python.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+      
+      python.stderr.on('data', (data) => {
+        error += data.toString();
+      });
+      
+      python.on('close', (code) => {
+        if (code === 0) {
+          res.json({ 
+            nutrition_advice: output.trim(),
+            client_stats: clientStats
+          });
+        } else {
+          console.error('Python error:', error);
+          res.status(500).json({ error: 'Failed to get nutrition advice' });
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error calling fitness assistant:', error);
+      res.status(500).json({ error: 'Failed to get nutrition advice' });
+    }
+  });
+
   // Helper: build export text
   async function buildExportText(): Promise<string> {
     const logs = await storage.getPullupLogs();

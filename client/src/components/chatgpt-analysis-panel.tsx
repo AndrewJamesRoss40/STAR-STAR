@@ -74,12 +74,64 @@ export function ChatGPTAnalysisPanel() {
     },
   });
 
+  const fitnessAnalysisMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/fitness-assistant/analyze');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAnalysisResult(data.analysis);
+      setAnalysisTimestamp(new Date().toLocaleString());
+      toast({
+        title: "Analysis Complete",
+        description: "Your fitness specialist has analyzed your workout data.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Analysis Failed",
+        description: "Failed to get fitness analysis. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const nutritionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/fitness-assistant/nutrition');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAnalysisResult(data.nutrition_advice);
+      setAnalysisTimestamp(new Date().toLocaleString());
+      toast({
+        title: "Nutrition Advice Ready",
+        description: "Your nutrition specialist has provided personalized advice.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Nutrition Analysis Failed",
+        description: "Failed to get nutrition advice. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAnalyze = () => {
     analysisMutation.mutate();
   };
 
   const handleExport = () => {
     exportMutation.mutate();
+  };
+
+  const handleFitnessAnalysis = () => {
+    fitnessAnalysisMutation.mutate();
+  };
+
+  const handleNutritionAdvice = () => {
+    nutritionMutation.mutate();
   };
 
   return (
@@ -90,20 +142,36 @@ export function ChatGPTAnalysisPanel() {
             <Bot className="text-purple-500 mr-2 h-5 w-5" />
             AI Analysis
           </CardTitle>
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={handleAnalyze}
               disabled={analysisMutation.isPending}
-              className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               <Brain className="mr-2 h-4 w-4" />
-              {analysisMutation.isPending ? "Analyzing..." : "Get Analysis"}
+              {analysisMutation.isPending ? "Analyzing..." : "Basic Analysis"}
+            </Button>
+            <Button
+              onClick={handleFitnessAnalysis}
+              disabled={fitnessAnalysisMutation.isPending}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              <Brain className="mr-2 h-4 w-4" />
+              {fitnessAnalysisMutation.isPending ? "Analyzing..." : "Fitness Coach"}
+            </Button>
+            <Button
+              onClick={handleNutritionAdvice}
+              disabled={nutritionMutation.isPending}
+              className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              <Brain className="mr-2 h-4 w-4" />
+              {nutritionMutation.isPending ? "Loading..." : "Nutrition"}
             </Button>
             <Button
               onClick={handleExport}
               disabled={exportMutation.isPending}
               variant="outline"
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
             >
               <Download className="mr-2 h-4 w-4" />
               Export
@@ -113,10 +181,14 @@ export function ChatGPTAnalysisPanel() {
       </CardHeader>
       <CardContent>
         <div className="min-h-24">
-          {analysisMutation.isPending ? (
+          {(analysisMutation.isPending || fitnessAnalysisMutation.isPending || nutritionMutation.isPending) ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-              <span className="ml-3 text-slate-600">Analyzing your progress...</span>
+              <span className="ml-3 text-slate-600">
+                {analysisMutation.isPending && "Analyzing your progress..."}
+                {fitnessAnalysisMutation.isPending && "Your fitness coach is analyzing your data..."}
+                {nutritionMutation.isPending && "Getting personalized nutrition advice..."}
+              </span>
             </div>
           ) : analysisResult ? (
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-4">

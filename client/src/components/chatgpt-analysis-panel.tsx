@@ -39,11 +39,31 @@ export function ChatGPTAnalysisPanel() {
       return response.json();
     },
     onSuccess: (data) => {
-      navigator.clipboard.writeText(data.export);
-      toast({
-        title: "Exported!",
-        description: "Progress data copied to clipboard.",
-      });
+      // For mobile browsers, show the data instead of trying clipboard
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(data.export).then(() => {
+          toast({
+            title: "Exported!",
+            description: "Progress data copied to clipboard.",
+          });
+        }).catch(() => {
+          // Fallback: show data for manual copy
+          setAnalysisResult(`EXPORT DATA:\n\n${data.export}`);
+          setAnalysisTimestamp(new Date().toLocaleString());
+          toast({
+            title: "Export Ready",
+            description: "Data displayed below - tap and hold to copy.",
+          });
+        });
+      } else {
+        // Mobile fallback: display data for manual copy
+        setAnalysisResult(`EXPORT DATA:\n\n${data.export}`);
+        setAnalysisTimestamp(new Date().toLocaleString());
+        toast({
+          title: "Export Ready",
+          description: "Data displayed below - tap and hold to copy.",
+        });
+      }
     },
     onError: () => {
       toast({
